@@ -28,10 +28,19 @@ mc admin config set myminio logger_webhook endpoint=http://webhookendpoint:8081 
 
 > NOTE: audit_webhook and logger_webhook should *not* be configured to send events to the same webhook instance.
 
-Logs can be rotated using the standard logrotate tool. You can provide the postrotate command such that
-webhook writes to a new log file after log rotation.
 ```
-postrotate
-	systemctl reload webhook
-endscript
+$ ./webhook -h                 
+Usage of ./webhook:
+  -address string
+        bind to a specific ADDRESS:PORT, ADDRESS can be an IP or hostname (default ":8080")
+  -compress
+        Compress determines if the rotated log files should be compressed using gzip. The default is not to perform compression.
+  -log-file string
+        path to the file where webhook will log incoming events
+  -maxAge int
+        MaxAge is the maximum number of days to retain old log files based on the timestamp encoded in their filename. Note that a day is defined as 24 hours and may not exactly correspond to calendar days due to daylight savings, leap seconds, etc. The default is not to remove old log files based on age. (default 30)
+  -maxBackups int
+        MaxBackups is the maximum number of old log files to retain. The default is to retain all old log files (though MaxAge may still cause them to get deleted.) (default 5)
+  -maxSize int
+        MaxSize is the maximum size in megabytes of the log file before it gets rotated. It defaults to 100 megabytes. (default 5120)
 ```
