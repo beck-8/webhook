@@ -22,54 +22,55 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"sync"
-	"syscall"
 
 	"github.com/minio/pkg/env"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
-	logFile   string
-	address   string
-	authToken = env.Get("WEBHOOK_AUTH_TOKEN", "")
+	logFile    string
+	maxSize    int
+	maxBackups int
+	maxAge     int
+	compress   bool
+	address    string
+	authToken  = env.Get("WEBHOOK_AUTH_TOKEN", "")
 )
 
 func main() {
 	flag.StringVar(&logFile, "log-file", "", "path to the file where webhook will log incoming events")
+	flag.IntVar(&maxSize, "maxSize", 1024*5, "MaxSize is the maximum size in megabytes of the log file before it gets rotated. It defaults to 100 megabytes.")
+	flag.IntVar(&maxBackups, "maxBackups", 5, "MaxBackups is the maximum number of old log files to retain. The default is to retain all old log files (though MaxAge may still cause them to get deleted.)")
+	flag.IntVar(&maxAge, "maxAge", 30, "MaxAge is the maximum number of days to retain old log files based on the timestamp encoded in their filename. Note that a day is defined as 24 hours and may not exactly correspond to calendar days due to daylight savings, leap seconds, etc. The default is not to remove old log files based on age.")
+	flag.BoolVar(&compress, "compress", false, "Compress determines if the rotated log files should be compressed using gzip. The default is not to perform compression.")
 	flag.StringVar(&address, "address", ":8080", "bind to a specific ADDRESS:PORT, ADDRESS can be an IP or hostname")
 
 	flag.Parse()
 
+	encoderCfg := zap.NewProductionEncoderConfig()
+	encoderCfg.TimeKey = ""  // 关闭时间戳
+	encoderCfg.LevelKey = "" // 关闭日志级别
+	core := zapcore.NewCore(
+		zapcore.NewConsoleEncoder(encoderCfg), // 选择控制台编码器
+		zapcore.AddSync(&lumberjack.Logger{
+			Filename:   logFile,
+			MaxSize:    maxSize,
+			MaxBackups: maxBackups,
+			MaxAge:     maxAge,
+			Compress:   compress,
+		}),
+		zap.InfoLevel,
+	)
+	logger := zap.New(core)
+	defer logger.Sync()
+
 	if logFile == "" {
 		log.Fatalln("--log-file must be specified")
 	}
-
-	l, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	var mu sync.Mutex
-
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGHUP)
-
-	go func() {
-		for _ = range sigs {
-			mu.Lock()
-			l.Sync()  // flush to disk any temporary buffers.
-			l.Close() // then close the file, before rotation.
-			l, err = os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0640)
-			if err != nil {
-				log.Fatal(err)
-			}
-			mu.Unlock()
-		}
-	}()
-
-	err = http.ListenAndServe(address, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	log.Println("listen addr", address)
+	err := http.ListenAndServe(address, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if authToken != "" {
 			if authToken != r.Header.Get("Authorization") {
 				http.Error(w, "authorization header missing", http.StatusBadRequest)
@@ -78,14 +79,14 @@ func main() {
 		}
 		switch r.Method {
 		case http.MethodPost:
-			mu.Lock()
-			_, err := io.Copy(l, r.Body)
+			// 读取请求body
+			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				mu.Unlock()
+				http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 				return
 			}
-			l.WriteString("\n")
-			mu.Unlock()
+			defer r.Body.Close()
+			logger.Info(string(body))
 		default:
 		}
 	}))
