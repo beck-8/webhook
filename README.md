@@ -29,7 +29,7 @@ mc admin config set myminio logger_webhook endpoint=http://webhookendpoint:8081 
 > NOTE: audit_webhook and logger_webhook should *not* be configured to send events to the same webhook instance.
 
 ```
-$ ./webhook -h                 
+$ ./webhook -h     
 Usage of ./webhook:
   -address string
         bind to a specific ADDRESS:PORT, ADDRESS can be an IP or hostname (default ":8080")
@@ -38,9 +38,9 @@ Usage of ./webhook:
   -log-file string
         path to the file where webhook will log incoming events
   -maxAge int
-        MaxAge is the maximum number of days to retain old log files based on the timestamp encoded in their filename. Note that a day is defined as 24 hours and may not exactly correspond to calendar days due to daylight savings, leap seconds, etc. The default is not to remove old log files based on age. (default 30)
+        MaxAge is the maximum number of days to retain old log files based on the timestamp encoded in their filename. Note that a day is defined as 24 hours and may not exactly correspond to calendar days due to daylight savings, leap seconds, etc. (default 30)
   -maxBackups int
-        MaxBackups is the maximum number of old log files to retain. The default is to retain all old log files (though MaxAge may still cause them to get deleted.) (default 5)
+        MaxBackups is the maximum number of old log files to retain. (default 5)
   -maxSize int
-        MaxSize is the maximum size in megabytes of the log file before it gets rotated. It defaults to 100 megabytes. (default 5120)
+        MaxSize is the maximum size in megabytes of the log file before it gets rotated. It defaults to 1024*5 megabytes. (default 5120)
 ```
