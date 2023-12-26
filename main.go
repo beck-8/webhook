@@ -74,6 +74,7 @@ func main() {
 		if authToken != "" {
 			if authToken != r.Header.Get("Authorization") {
 				http.Error(w, "authorization header missing", http.StatusBadRequest)
+				log.Println("authorization header missing", http.StatusBadRequest)
 				return
 			}
 		}
@@ -83,6 +84,7 @@ func main() {
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
 				http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+				log.Println(err, "Failed to read request body", http.StatusInternalServerError)
 				return
 			}
 			defer r.Body.Close()
